@@ -1,0 +1,14 @@
+: this is a template file
+: template files are only for @-commands and don't contain text
+
+: we can use templates in templates and even more than one
+: in case of overrides the last value is used
+@template footer
+@template author
+
+
+@color 255, 0, 0 : we like blue
+
+: this footer is appended to every embed using this template
+@footer Made by
+@footer& https://cdn.discordapp.com/avatars/489766550451257345/b77b7a60da28e604ada933eb2773b2b4.png?size=1024 : footer image
