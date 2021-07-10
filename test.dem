@@ -1,4 +1,11 @@
-: A basic Discord Embed Markup file for develoment purposes
+: A basic Discord Embed Markup file for development purposes
+
+: TODO: comments after commands (line 21, 40)
+: TODO: newline = space, x newline = x - 1 newlines
+: TODO: templates
+: TODO: url pattern verification
+: TODO: color translation
+: TODO: timestamps
 
 : extend a file called base.template.dem
 @template base
@@ -8,7 +15,7 @@
 ?$ : current time as timestamp
 
 @author Anton Vogelsang
-@author& https://ximanton.de
+@author? https://ximanton.de
 
 @url https://github.com/xImAnton/Discord-Embed-Markup
 @thumbnail https://discord.com/assets/f9bb9c4af2b9c32a2c5ee0014661546d.png : discord logo
@@ -16,14 +23,17 @@
 # Try out Discord Embed Markup : embed title
 
 You can describe embeds
-
+: here is no longer a newline
 yay
 
-## This is a field
+a free line is translated into a newline
+
+## Field names start with ##
 this is the text of the field&
 
 ## second field
-when the text of a field ends with &, it's an inline field&
+when the text of a field ends with &,
+it's an inline field&
 
-@footer Made by
+@footer Made by xImAnton
 @footer& https://cdn.discordapp.com/avatars/489766550451257345/b77b7a60da28e604ada933eb2773b2b4.png?size=1024 : footer image
