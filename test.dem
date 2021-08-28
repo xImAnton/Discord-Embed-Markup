@@ -1,11 +1,7 @@
 : A basic Discord Embed Markup file for development purposes
 
 : TODO: comments after commands (line 21, 40)
-: TODO: newline = space, x newline = x - 1 newlines
-: TODO: templates
 : TODO: url pattern verification
-: TODO: color translation
-: TODO: timestamps
 
 @template base
 
