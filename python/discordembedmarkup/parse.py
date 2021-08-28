@@ -3,95 +3,8 @@ from typing import List
 from .util import NonEmptyValueDict
 
 from typing import Tuple
-
-
-def rgb_to_int(r: int, g: int, b: int) -> int:
-    return (r << 16) + (g << 8) + b
-
-
-def strip_comments(line: str) -> Tuple[str, bool]:
-    """
-    strips all comments from the line
-    a comment starts with a : and goes to the end of the line
-    colons can be used in text using \:
-    :param line: the line to strip
-    :return: the line without comments and a bool indicating whether a comment was removed
-    """
-    # try to find a colon
-    if line.startswith("@"):
-        return line, False
-    try:
-        colon = line.index(":")
-    except ValueError:
-        return line, False
-
-    # when the colon is escaped
-    if colon > 0 and line[colon - 1] == "\\":
-        return line[:colon - 1] + line[colon:], True
-
-    # remove anything behind the colon
-    return line[:colon], True
-
-
-def strip_from_begin(line: str, substring: str) -> str:
-    return line[len(substring):]
-
-
-def split_command(command: str) -> Tuple[str, str]:
-    space = command.index(" ")
-    return command[1:space], command[space + 1:]
-
-
-def parse(file) -> Embed:
-    with open(file, "r") as f:
-        data = f.readlines()
-
-    embed = Embed()
-    context = None
-    previous_line_empty = False
-    for line in data:
-        line, has_comment = strip_comments(line)
-        line = line.strip()
-        new_previous_line_empty = (not previous_line_empty and not has_comment and line) or \
-                                  (previous_line_empty and not has_comment and line) or \
-                                  (previous_line_empty and has_comment and line)
-        # embed title
-        if line.startswith("# "):
-            embed.title = strip_from_begin(line, "# ")
-            context = embed
-            continue
-
-        # field title
-        if line.startswith("## "):
-            context = EmbedField()
-            context.title = strip_from_begin(line, "## ")
-            embed.fields.append(context)
-            continue
-
-        # command
-        if line.startswith("@"):
-            command, argument = split_command(line)
-            if not embed.command(command, argument):
-                raise NameError("unsupported command: " + command)
-            continue
-
-        # set color
-        if line.startswith("%"):
-            embed.set_color(line[1:])
-
-        # set timestamp
-        if line.startswith("?"):
-            continue
-
-        # add whitespace
-        line = ("\n" if previous_line_empty else " ") + line
-
-        if context:
-            context.text += line
-
-        previous_line_empty = new_previous_line_empty
-    return embed
-
+import os.path
+import pathlib
 
 
 class Context:
@@ -134,8 +47,9 @@ class EmbedField(Context):
 
 
 class EmbedTemplate:
-    def __init__(self):
+    def __init__(self, dir_context: str):
         super(EmbedTemplate, self).__init__()
+        self.dir_ctx: str = dir_context
         self.url: str = ""
         self.color: int = 0
         self.timestamp: int = 0
@@ -178,7 +92,8 @@ class EmbedTemplate:
             self.footer_icon = argument
         elif name == "template":
             try:
-                e = parse(f"{argument}.template.dem")
+                template_path = os.path.join(self.dir_ctx, f"{argument}.template.dem")
+                e = parse(template_path, True)
             except FileNotFoundError:
                 print(f"could not load template: {argument}")
                 return True
@@ -211,8 +126,8 @@ class EmbedTemplate:
 
 
 class Embed(EmbedTemplate, Context):
-    def __init__(self):
-        super(Embed, self).__init__()
+    def __init__(self, dir_context: str):
+        super(Embed, self).__init__(dir_context)
         self.fields: List[EmbedField] = []
         self.image: str = ""
 
@@ -238,3 +153,100 @@ class Embed(EmbedTemplate, Context):
                 "icon_url": self.author_icon
             })
         })
+
+
+def rgb_to_int(r: int, g: int, b: int) -> int:
+    return (r << 16) + (g << 8) + b
+
+
+def strip_comments(line: str) -> Tuple[str, bool]:
+    """
+    strips all comments from the line
+    a comment starts with a : and goes to the end of the line
+    colons can be used in text using \:
+    :param line: the line to strip
+    :return: the line without comments and a bool indicating whether a comment was removed
+    """
+    # try to find a colon
+    if line.startswith("@"):
+        return line, False
+    try:
+        colon = line.index(":")
+    except ValueError:
+        return line, False
+
+    # when the colon is escaped
+    if colon > 0 and line[colon - 1] == "\\":
+        return line[:colon - 1] + line[colon:], True
+
+    # remove anything behind the colon
+    return line[:colon], True
+
+
+def strip_from_begin(line: str, substring: str) -> str:
+    return line[len(substring):]
+
+
+def split_command(command: str) -> Tuple[str, str]:
+    space = command.index(" ")
+    return command[1:space], command[space + 1:]
+
+
+def parse(file, template: bool = False) -> Embed:
+    with open(file, "r") as f:
+        data = f.readlines()
+
+    directory_ctx = str(pathlib.Path(file).parent.absolute())
+
+    embed = EmbedTemplate(directory_ctx) if template else Embed(directory_ctx)
+    context = None
+    previous_line_empty = False
+    for line in data:
+        line, has_comment = strip_comments(line)
+        line = line.strip()
+        new_previous_line_empty = (not previous_line_empty and not has_comment and line) or \
+                                  (previous_line_empty and not has_comment and line) or \
+                                  (previous_line_empty and has_comment and line)
+        # embed title
+        if line.startswith("# "):
+            if template:
+                raise ValueError(f"you can set text inside a template, found {line}")
+            embed.title = strip_from_begin(line, "# ")
+            context = embed
+            continue
+
+        # field title
+        if line.startswith("## "):
+            if template:
+                raise ValueError(f"you can set text inside a template, found {line}")
+            context = EmbedField()
+            context.title = strip_from_begin(line, "## ")
+            embed.fields.append(context)
+            continue
+
+        # command
+        if line.startswith("@"):
+            command, argument = split_command(line)
+            if not embed.command(command, argument):
+                raise NameError("unsupported command: " + command)
+            continue
+
+        # set color
+        if line.startswith("%"):
+            embed.set_color(line[1:])
+
+        # set timestamp
+        if line.startswith("?"):
+            continue
+
+        if template:
+            continue
+
+        # add whitespace
+        line = ("\n" if previous_line_empty else " ") + line
+
+        if context:
+            context.text += line
+
+        previous_line_empty = new_previous_line_empty
+    return embed

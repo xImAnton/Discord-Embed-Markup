@@ -1,11 +1,6 @@
 : this is a template file
 : template files are only for @-commands and don't contain text
 
-: we can use templates in templates and even more than one
-: in case of overrides the last value is used
-@template footer
-@template author
-
  : we like red
 @color 255, 0, 0
 

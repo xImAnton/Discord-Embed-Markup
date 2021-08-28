@@ -1,7 +1,7 @@
 import discordembedmarkup
 import discord
 import importlib
-from token import token
+import dctoken
 
 
 client = discord.Client()
@@ -17,4 +17,4 @@ async def on_message(msg):
 
 
 if __name__ == '__main__':
-    client.run(token)
+    client.run(dctoken.token)

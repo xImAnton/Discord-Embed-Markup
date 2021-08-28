@@ -7,8 +7,9 @@
 : TODO: color translation
 : TODO: timestamps
 
+@template base
+
 : extend a file called base.template.dem
-@template ../base
 
 %255, 127, 0 : color of the embed -> orange
 ?1234567890 : timestamp
