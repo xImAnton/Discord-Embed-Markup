@@ -1,6 +1,12 @@
+from __future__ import annotations
+from typing import List
+from .util import NonEmptyValueDict
+
 from typing import Tuple
 
-from .models import Embed, EmbedField
+
+def rgb_to_int(r: int, g: int, b: int) -> int:
+    return (r << 16) + (g << 8) + b
 
 
 def strip_comments(line: str) -> Tuple[str, bool]:
@@ -71,7 +77,7 @@ def parse(file) -> Embed:
 
         # set color
         if line.startswith("%"):
-            continue
+            embed.set_color(line[1:])
 
         # set timestamp
         if line.startswith("?"):
@@ -85,3 +91,150 @@ def parse(file) -> Embed:
 
         previous_line_empty = new_previous_line_empty
     return embed
+
+
+
+class Context:
+    """
+    represents a context that normal text is appended to
+    """
+    def __init__(self):
+        self.text: str = ""
+        self.title: str = ""
+
+    def to_json(self) -> dict:
+        """
+        returns a json representation of this component as dict
+        :return: the json as dict
+        """
+        return {}
+
+    def assert_filled(self):
+        if not self.title.strip():
+            raise ValueError("title cannot be empty")
+        if not self.text.strip():
+            raise ValueError("field text cannot be empty")
+
+
+class EmbedField(Context):
+    def to_json(self) -> dict:
+        self.assert_filled()
+
+        text = self.text.strip()
+        inline = False
+        if text.endswith("&") and not text.endswith("\\&"):
+            inline = True
+            text = text[:-1]
+
+        return NonEmptyValueDict({
+            "name": self.title,
+            "value": text,
+            "inline": inline
+        })
+
+
+class EmbedTemplate:
+    def __init__(self):
+        super(EmbedTemplate, self).__init__()
+        self.url: str = ""
+        self.color: int = 0
+        self.timestamp: int = 0
+        self.author_name: str = ""
+        self.author_icon: str = ""
+        self.author_url: str = ""
+        self.footer_text: str = ""
+        self.footer_icon: str = ""
+        self.thumbnail: str = ""
+
+    def set_color(self, arg):
+        rgb = [int(c) for c in arg.split(",")]
+        if len(rgb) == 1:
+            self.color = rgb_to_int(rgb[0], rgb[0], rgb[0])
+        if len(rgb) == 3:
+            self.color = rgb_to_int(*rgb)
+        else:
+            raise ValueError(f"{arg} could not be converted into a color")
+
+    def command(self, name, argument) -> bool:
+        """
+        mutates this embed depending on the command
+        :param name: the name of the command, see the docs for reference
+        :param argument: the command argument
+        :return: whether the command execution was successful
+        """
+        if name == "author":
+            self.author_name = argument
+        elif name == "author&":
+            self.author_icon = argument
+        elif name == "author?":
+            self.author_url = argument
+        elif name == "url" or name == "?":
+            self.url = argument
+        elif name == "thumbnail":
+            self.thumbnail = argument
+        elif name == "footer":
+            self.footer_text = argument
+        elif name == "footer&":
+            self.footer_icon = argument
+        elif name == "template":
+            try:
+                e = parse(f"{argument}.template.dem")
+            except FileNotFoundError:
+                print(f"could not load template: {argument}")
+                return True
+            self.apply_template(e)
+        elif name == "color":
+            self.set_color(argument)
+        else:
+            return False
+        return True
+
+    def apply_template(self, template: EmbedTemplate):
+        if template.color:
+            self.color = template.color
+        if template.url:
+            self.url = template.url
+        if template.author_url:
+            self.author_url = template.author_url
+        if template.author_icon:
+            self.author_icon = template.author_icon
+        if template.author_name:
+            self.author_name = template.author_name
+        if template.thumbnail:
+            self.thumbnail = template.thumbnail
+        if template.footer_icon:
+            self.footer_icon = template.footer_icon
+        if template.footer_text:
+            self.footer_text = template.footer_text
+        if template.timestamp:
+            self.timestamp = template.timestamp
+
+
+class Embed(EmbedTemplate, Context):
+    def __init__(self):
+        super(Embed, self).__init__()
+        self.fields: List[EmbedField] = []
+        self.image: str = ""
+
+    def to_json(self) -> dict:
+        self.assert_filled()
+
+        return NonEmptyValueDict({
+            "title": self.title,
+            "description": self.text.strip(),
+            "url": self.url,
+            "timestamp": self.timestamp,
+            "color": self.color,
+            "footer": NonEmptyValueDict({
+                "text": self.footer_text.strip(),
+                "icon_url": self.footer_icon
+            }),
+            "fields": [f.to_json() for f in self.fields],
+            "image": NonEmptyValueDict({"url": self.image}),
+            "thumbnail": NonEmptyValueDict({"url": self.thumbnail}),
+            "author": NonEmptyValueDict({
+                "name": self.author_name,
+                "url": self.author_url,
+                "icon_url": self.author_icon
+            })
+        })
