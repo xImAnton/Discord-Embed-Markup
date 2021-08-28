@@ -5,6 +5,7 @@ from .util import NonEmptyValueDict
 from typing import Tuple
 import os.path
 import pathlib
+from datetime import datetime
 
 
 class Context:
@@ -159,6 +160,10 @@ def rgb_to_int(r: int, g: int, b: int) -> int:
     return (r << 16) + (g << 8) + b
 
 
+def format_timestamp(dt: datetime) -> str:
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.%f%z')
+
+
 def strip_comments(line: str) -> Tuple[str, bool]:
     """
     strips all comments from the line
@@ -237,7 +242,12 @@ def parse(file, template: bool = False) -> Embed:
 
         # set timestamp
         if line.startswith("?"):
-            continue
+            time_data = line[1:]
+            if time_data == "$":
+                timestamp = datetime.now() - datetime.now().astimezone().tzinfo.utcoffset(datetime.now())
+            else:
+                timestamp = datetime.fromtimestamp(int(time_data))
+            embed.timestamp = timestamp.isoformat()
 
         if template:
             continue

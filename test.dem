@@ -12,7 +12,7 @@
 : extend a file called base.template.dem
 
 %255, 127, 0 : color of the embed -> orange
-?1234567890 : timestamp
+: ?1234567890 : timestamp
 ?$ : current time as timestamp
 
 @author Anton Vogelsang
