@@ -1,18 +1,17 @@
-import discordembedmarkup
+import discordembedmarkup as dem
 import discord
-import importlib
 import dctoken
 
 
 client = discord.Client()
+dem.parse_blueprint("../test.dem")
 
 
 @client.event
 async def on_message(msg):
     if not msg.content.startswith("?test"):
         return
-    importlib.reload(discordembedmarkup)
-    embed = discord.Embed.from_dict(discordembedmarkup.parse("../test.dem").to_json())
+    embed = discord.Embed.from_dict(dem.load_blueprint("test").to_json())
     await msg.channel.send(embed=embed)
 
 

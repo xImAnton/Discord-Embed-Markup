@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List
+from typing import List, Dict, Any, Optional
 from .util import NonEmptyValueDict
 
 from typing import Tuple
@@ -94,7 +94,7 @@ class EmbedTemplate:
         elif name == "template":
             try:
                 template_path = os.path.join(self.dir_ctx, f"{argument}.template.dem")
-                e = parse(template_path, True)
+                e = parse(template_path, EmbedTemplate)
             except FileNotFoundError:
                 print(f"could not load template: {argument}")
                 return True
@@ -131,6 +131,16 @@ class Embed(EmbedTemplate, Context):
         super(Embed, self).__init__(dir_context)
         self.fields: List[EmbedField] = []
         self.image: str = ""
+        self.name: str = ""
+
+    def command(self, name, argument) -> bool:
+        if super().command(name, argument):
+            return True
+        elif name == "name":
+            self.name = argument
+        else:
+            return False
+        return True
 
     def to_json(self) -> dict:
         self.assert_filled()
@@ -197,13 +207,13 @@ def split_command(command: str) -> Tuple[str, str]:
     return command[1:space], command[space + 1:]
 
 
-def parse(file, template: bool = False) -> Embed:
+def parse(file, clazz=Embed) -> Embed:
     with open(file, "r") as f:
         data = f.readlines()
 
     directory_ctx = str(pathlib.Path(file).parent.absolute())
 
-    embed = EmbedTemplate(directory_ctx) if template else Embed(directory_ctx)
+    embed = clazz(directory_ctx)
     context = None
     previous_line_empty = False
     for line in data:
@@ -214,7 +224,7 @@ def parse(file, template: bool = False) -> Embed:
                                   (previous_line_empty and has_comment and line)
         # embed title
         if line.startswith("# "):
-            if template:
+            if clazz == EmbedTemplate:
                 raise ValueError(f"you can set text inside a template, found {line}")
             embed.title = strip_from_begin(line, "# ")
             context = embed
@@ -222,7 +232,7 @@ def parse(file, template: bool = False) -> Embed:
 
         # field title
         if line.startswith("## "):
-            if template:
+            if clazz == EmbedTemplate:
                 raise ValueError(f"you can set text inside a template, found {line}")
             context = EmbedField()
             context.title = strip_from_begin(line, "## ")
@@ -249,7 +259,7 @@ def parse(file, template: bool = False) -> Embed:
                 timestamp = datetime.fromtimestamp(int(time_data))
             embed.timestamp = timestamp.isoformat()
 
-        if template:
+        if clazz == EmbedTemplate:
             continue
 
         # add whitespace
@@ -259,4 +269,60 @@ def parse(file, template: bool = False) -> Embed:
             context.text += line
 
         previous_line_empty = new_previous_line_empty
+    return embed
+
+
+def recursive_replace(i: Any, replacements: Dict[str, Any]) -> Any:
+    if isinstance(i, dict):
+        out = {}
+        for k, v in i.items():
+            out[k] = recursive_replace(v, replacements)
+        return out
+    elif isinstance(i, list):
+        out = []
+        for v in i:
+            out.append(recursive_replace(v, replacements))
+        return out
+    elif isinstance(i, str):
+        for k, v in replacements.items():
+            i = i.replace(k, v)
+    return i
+
+
+class EmbedBlueprint(Embed):
+    def __init__(self, dir_context: str):
+        super().__init__(dir_context)
+        self.templates: Dict[str, Optional[str]] = {}
+
+    def command(self, name, argument) -> bool:
+        if super().command(name, argument):
+            return True
+        elif name == "replace":
+            args = argument.split(" ")
+            default = None
+            key = args[0]
+            if args[0].endswith("?") and len(args) > 1:
+                key = key[:-1]
+                default = args[1]
+            self.templates[key] = default
+        else:
+            return False
+        return True
+
+    def to_json(self, **kwargs) -> dict:
+        super_return = super().to_json()
+
+        replacements = {}
+
+        for k in self.templates.keys():
+            val = kwargs.get(k, self.templates[k])
+            if not val:
+                raise ValueError(f"missing replacement values for key: {k}")
+            replacements[k] = val
+
+        return recursive_replace(super_return, replacements)
+
+
+def parse_blueprint(file: str) -> EmbedBlueprint:
+    embed = parse(file, EmbedBlueprint)
     return embed
